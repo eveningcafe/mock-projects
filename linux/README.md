@@ -8,6 +8,8 @@ Bạn là DevOps engineer duy nhất của một startup. Công ty chưa có gì
 
 ## Kiến trúc Hạ tầng — Infrastructure Architecture
 
+Hệ thống gồm 4 VM kết nối trong mạng nội bộ `corp.internal`. `infra-vm` đóng vai trò trung tâm — cung cấp DNS và NTP cho toàn bộ hệ thống. `storage-vm` chạy MinIO lưu object. `app-vm` chạy toàn bộ tầng ứng dụng và database. `client-vm` dùng để kiểm tra và test.
+
 ```
                           mạng corp.internal
   ┌───────────────────────────────────────────────────────────────────┐
@@ -41,6 +43,8 @@ Bạn là DevOps engineer duy nhất của một startup. Công ty chưa có gì
 ```
 
 ### Nâng cao (điểm cộng)
+
+Phần nâng cao yêu cầu cấu hình **High Availability** cho từng thành phần — hệ thống phải tiếp tục hoạt động khi một node bị tắt. Sinh viên chọn làm một hoặc nhiều hạng mục, mỗi hạng mục tính điểm riêng.
 
 | Thành phần | Cơ bản | Nâng cao |
 |---|---|---|
@@ -227,7 +231,7 @@ Tất cả cài trên `app-vm`, data lưu trên partition từ Phase 1.
 
 ### Phase 6 — Packaging & Deployment
 
-Ping App được **cung cấp sẵn bởi giảng viên** dưới dạng source code.
+Ping App được **cung cấp sẵn bởi giảng viên** dưới dạng source code — xem tại [`pingapp/`](./pingapp).
 
 1. Đọc source code, cài dependencies thủ công và chạy thử
 2. Điền đúng hostname các service (từ Phase 2) vào file cấu hình
@@ -272,7 +276,7 @@ Mỗi kịch bản: chụp màn hình lúc lỗi → hệ thống vẫn chạy t
 
 ## Output và Tài liệu — Deliverables
 
-Tất cả output nộp trong **một thư mục duy nhất** với cấu trúc sau:
+Tất cả output nộp trong **một thư mục duy nhất** với cấu trúc sau (xem ví dụ tại [`submission-example/`](./submission-example)):
 
 ```
 submission-example/
