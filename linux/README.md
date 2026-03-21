@@ -134,7 +134,7 @@ Chọn **một** trong hai lựa chọn bên dưới.
 | `storage` | t3.micro | 2 / 1 GB | 10 GB | ~$0.5 |
 | `app` | t3.small | 2 / 2 GB | 10 GB | ~$1 |
 | `client` | t3.micro | 2 / 1 GB | 8 GB | ~$0.5 |
-| **Tổng mỗi sinh viên** | | | | **~$2–4** |
+| **Tổng mỗi học viên** | | | | **~$2–4** |
 
 #### Advanced (optional)
 
@@ -144,7 +144,7 @@ Chọn **một** trong hai lựa chọn bên dưới.
 | `app-2` | t3.small | 2 / 2 GB | 10 GB | ~$1 |
 | `mongo-2`, `mongo-3` | t3.micro mỗi VM | 2 / 1 GB | 8 GB mỗi VM | ~$0.5 mỗi VM |
 | `mariadb-replica` | t3.micro | 2 / 1 GB | 8 GB | ~$0.5 |
-| **Tổng mỗi sinh viên** | | | | **~$6–10** |
+| **Tổng mỗi học viên** | | | | **~$6–10** |
 
 > *Ước tính trên cho **toàn bộ dự án 1 tuần**, chỉ tính giờ chạy thực tế (~4–6 giờ/ngày × 5 ngày = ~25 giờ). **Tắt instance khi không dùng** . 
 > Tất cả dùng Ubuntu 22.04 LTS, cùng region, cùng VPC.
@@ -246,7 +246,7 @@ Ping App được **cung cấp sẵn bởi giảng viên** dưới dạng source
 
 ## Kiểm tra HA — HA Testing (Nâng cao)
 
-Sau khi hoàn thành phần nâng cao, sinh viên phải demo khả năng chịu lỗi:
+Sau khi hoàn thành phần nâng cao, học viên phải demo khả năng chịu lỗi:
 
 | Kịch bản | Cách kích hoạt | Kết quả mong đợi |
 |---|---|---|
