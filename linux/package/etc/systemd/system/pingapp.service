@@ -1,0 +1,14 @@
+[Unit]
+Description=Ping App - Infrastructure Health Dashboard
+After=network.target
+
+[Service]
+User=nobody
+WorkingDirectory=/opt/pingapp
+EnvironmentFile=/etc/pingapp/pingapp.env
+ExecStart=/usr/bin/python3 /opt/pingapp/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+echo "[pingapp] Stopping and disabling service..."
+systemctl stop pingapp || true
+systemctl disable pingapp || true

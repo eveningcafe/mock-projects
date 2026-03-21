@@ -1,0 +1,5 @@
+flask>=3.0
+pymysql>=1.1
+pymongo>=4.6
+redis>=5.0
+minio>=7.2

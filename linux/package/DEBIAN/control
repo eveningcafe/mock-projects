@@ -1,0 +1,8 @@
+Package: pingapp
+Version: 1.0
+Architecture: amd64
+Maintainer: instructor
+Depends: python3, python3-pip
+Description: Infrastructure health dashboard for DevOps class
+ Checks connectivity to MariaDB, MongoDB, Redis, and MinIO.
+ Exposes a web dashboard at port 5000 and a /health JSON endpoint.

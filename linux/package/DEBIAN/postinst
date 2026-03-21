@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+echo "[pingapp] Installing Python dependencies..."
+pip3 install -r /opt/pingapp/requirements.txt --quiet
+
+echo "[pingapp] Enabling and starting service..."
+systemctl daemon-reload
+systemctl enable pingapp
+systemctl start pingapp
+
+echo "[pingapp] Done. Edit /etc/pingapp/pingapp.env then: systemctl restart pingapp"
