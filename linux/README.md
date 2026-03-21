@@ -44,7 +44,7 @@ Hệ thống gồm 4 VM kết nối trong mạng nội bộ `corp.internal`. `in
 
 ### Nâng cao (điểm cộng)
 
-Phần nâng cao yêu cầu cấu hình **High Availability** cho từng thành phần — hệ thống phải tiếp tục hoạt động khi một node bị tắt. Sinh viên chọn làm một hoặc nhiều hạng mục, mỗi hạng mục tính điểm riêng.
+Phần nâng cao yêu cầu cấu hình **High Availability** cho từng thành phần — hệ thống phải tiếp tục hoạt động khi một node bị tắt. Học viên chọn làm một hoặc nhiều hạng mục, mỗi hạng mục tính điểm riêng.
 
 | Thành phần | Cơ bản | Nâng cao |
 |---|---|---|
@@ -146,7 +146,7 @@ Chọn **một** trong hai lựa chọn bên dưới.
 | `mariadb-replica` | t3.micro | 2 / 1 GB | 8 GB | ~$0.5 |
 | **Tổng mỗi học viên** | | | | **~$6–10** |
 
-> *Ước tính trên cho **toàn bộ dự án 1 tuần**, chỉ tính giờ chạy thực tế (~4–6 giờ/ngày × 5 ngày = ~25 giờ). **Tắt instance khi không dùng** . 
+> ⚠️ **Tắt instance khi không làm việc** — nếu để chạy 24/7 cả tuần chi phí có thể tăng gấp 3–4 lần.
 > Tất cả dùng Ubuntu 22.04 LTS, cùng region, cùng VPC.
 
 ---
