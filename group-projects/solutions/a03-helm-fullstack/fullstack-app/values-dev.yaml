@@ -1,0 +1,14 @@
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+
+backend:
+  replicas: 1
+  tag: "6.5.0"
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi

@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-backend
+  labels:
+    {{- include "fullstack-app.labels" . | nindent 4 }}
+    app: backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      app: backend
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: backend
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: podinfo
+          image: "{{ .Values.backend.image }}:{{ .Values.backend.tag }}"
+          ports:
+            - containerPort: {{ .Values.backend.port }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}

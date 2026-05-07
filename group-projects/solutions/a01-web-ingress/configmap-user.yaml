@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-html
+data:
+  index.html: |
+    <!doctype html>
+    <html>
+      <head><title>g1 user</title></head>
+      <body>
+        <h1>User page — group 1</h1>
+        <p>Served by Deployment <code>user</code>.</p>
+      </body>
+    </html>
