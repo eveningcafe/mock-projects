@@ -8,8 +8,6 @@ kind: ServiceAccount
 metadata:
   name: jenkins
   namespace: jenkins
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::891920435433:role/cicd-demo-eks-jenkins-sa
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -24,6 +22,30 @@ roleRef:
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
 ---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jenkins-home
+  namespace: jenkins
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -31,6 +53,8 @@ metadata:
   namespace: jenkins
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels: { app: jenkins }
   template:
@@ -38,30 +62,21 @@ spec:
       labels: { app: jenkins }
     spec:
       serviceAccountName: jenkins
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: jenkins
-          image: 891920435433.dkr.ecr.ap-southeast-1.amazonaws.com/cicd-demo-app:jenkins-v1
+          image: jenkins/jenkins:lts
           ports:
             - containerPort: 8080
             - containerPort: 50000
-          env:
-            - name: DOCKER_HOST
-              value: tcp://localhost:2375
           volumeMounts:
             - name: home
               mountPath: /var/jenkins_home
-        - name: dind
-          image: docker:27-dind
-          securityContext:
-            privileged: true
-          env:
-            - name: DOCKER_TLS_CERTDIR
-              value: ""
-          args:
-            - --host=tcp://0.0.0.0:2375
       volumes:
         - name: home
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: jenkins-home
 ---
 apiVersion: v1
 kind: Service

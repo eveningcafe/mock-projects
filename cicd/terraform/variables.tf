@@ -56,7 +56,7 @@ variable "node_disk_size" {
 
 variable "use_spot_instances" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "public_access_cidrs" {

@@ -31,61 +31,100 @@ cicd/
 │   └── static/index.html
 ├── k8s/
 │   └── app.yaml               # Namespace + Secret + Deployment + Service + Ingress
-├── k8s-install-jenkins.yaml   # Cài Jenkins on-cluster (chạy 1 lần)
-├── terraform/                 # IaC: VPC + EKS + RDS + ECR
+├── k8s-install-jenkins.yaml   # Jenkins master (PVC gp3 + LoadBalancer)
+├── terraform/                 # IaC: VPC + EKS + RDS + ECR + EBS CSI + EC2 build machine
 └── ci/
-    └── Jenkinsfile            # Pipeline: Test → Build → Push ECR → Deploy EKS
+    └── Jenkinsfile            # Pipeline chạy trên EC2 agent
 ```
 
-## Tạo pipeline trên Jenkins
+## Kiến trúc CI/CD
 
-Sau khi `kubectl apply -f k8s-install-jenkins.yaml`, lấy URL và mật khẩu admin:
+- **Jenkins master**: chạy trên EKS, dữ liệu lưu PVC 10Gi (gp3). Không cài tool build, chỉ orchestrate.
+- **EC2 build machine**: instance riêng (t3.medium, Ubuntu 22.04) đã cài sẵn `docker`, `aws`, `kubectl`, `java`. Đăng ký vào Jenkins làm JNLP agent với label `ec2-build`. IAM instance profile có `ECRPowerUser` + `eks:DescribeCluster`.
+- **Pipeline** chạy trên EC2 agent → build Docker image local, push ECR, deploy lên EKS.
+
+## Lệnh thường dùng
 
 ```bash
+# URL Jenkins
 kubectl -n jenkins get svc jenkins -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+# Initial admin password (lần đầu)
 kubectl -n jenkins exec deploy/jenkins -- cat /var/jenkins_home/secrets/initialAdminPassword
+
+# EC2 build machine
+terraform -chdir=terraform output build_machine_public_ip
+ssh -i terraform/build-machine-key.pem ubuntu@<EC2_IP>
 ```
 
-**Setup ban đầu:**
+## Setup Jenkins master (chạy 1 lần)
 
-1. Mở Jenkins URL trong browser → **Unlock Jenkins** → paste password.
+1. Mở Jenkins URL → **Unlock Jenkins** → paste initial admin password.
 2. **Install suggested plugins** (đợi 2-3 phút).
-3. **Create First Admin User** → username/password tùy chọn.
-4. **Instance URL** → giữ mặc định → Save.
+3. **Create First Admin User** → username/password tùy chọn → Save.
 
-**Tạo Pipeline job:**
+## Đăng ký EC2 làm JNLP agent
 
-5. Trang chủ → **New Item** → tên `cicd-demo` → chọn **Pipeline** → OK.
-6. Trong job config, kéo xuống section **Pipeline**:
+Phía Jenkins:
+
+1. **Manage Jenkins → Nodes → New Node**:
+   - Node name: `ec2-build`
+   - Type: `Permanent Agent` → Create.
+2. Trong form node:
+   - Remote root directory: `/home/ubuntu/jenkins`
+   - **Labels**: `ec2-build`
+   - **Launch method**: `Launch agent by connecting it to the controller`
+   - Save.
+3. Sau khi save, click vào node `ec2-build` → copy đoạn lệnh `java -jar agent.jar ...` (có chứa secret).
+
+Phía EC2:
+
+```bash
+ssh -i terraform/build-machine-key.pem ubuntu@<EC2_IP>
+mkdir -p ~/jenkins && cd ~/jenkins
+curl -fsSL http://<JENKINS_URL>/jnlpJars/agent.jar -o agent.jar
+# Paste lệnh đã copy ở bước Jenkins UI:
+java -jar agent.jar -url http://<JENKINS_URL>/ -secret <SECRET> -name ec2-build -workDir /home/ubuntu/jenkins
+```
+
+Để agent chạy như systemd service (background):
+
+```bash
+sudo tee /etc/systemd/system/jenkins-agent.service > /dev/null <<EOF
+[Unit]
+Description=Jenkins JNLP Agent
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jenkins
+ExecStart=/usr/bin/java -jar /home/ubuntu/jenkins/agent.jar -url http://<JENKINS_URL>/ -secret <SECRET> -name ec2-build -workDir /home/ubuntu/jenkins
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload && sudo systemctl enable --now jenkins-agent
+```
+
+## Tạo Pipeline job
+
+1. Jenkins trang chủ → **New Item** → tên `cicd-demo` → **Pipeline** → OK.
+2. Trong job config, kéo xuống section **Pipeline**:
    - **Definition**: `Pipeline script from SCM`
    - **SCM**: `Git`
-   - **Repository URL**: repo Git của project (vd `git@github.com:<user>/mock-projects.git`)
+   - **Repository URL**: `https://github.com/<user>/mock-projects.git`
    - **Branch**: `*/main`
    - **Script Path**: `cicd/ci/Jenkinsfile`
-7. **Save** → **Build Now**.
+3. Tick **GitHub hook trigger for GITScm polling** → **Save** → **Build Now**.
 
-**Lưu ý**: image `jenkins/jenkins:lts` mặc định không có `docker`, `aws`, `kubectl`. Để pipeline chạy được cần một trong các cách:
+## Auto-trigger khi push code (GitHub webhook)
 
-- **Custom Jenkins image**: tự build image kế thừa `jenkins/jenkins:lts` cài thêm docker/aws/kubectl, push lên ECR, sửa deployment.
-- **Kubernetes plugin + Pod templates**: cài plugin `kubernetes`, dùng `agent { kubernetes {...} }` trong Jenkinsfile để spawn pod chứa sẵn tools.
+Repo GitHub → Settings → **Webhooks** → **Add webhook**:
 
-## Auto-trigger pipeline khi push code (GitHub webhook)
-
-Jenkinsfile đã có `triggers { githubPush() }`. Cần cấu hình thêm 2 phía:
-
-**1. Trên Jenkins:**
-
-- **Manage Jenkins → Plugins → Available** → cài plugin `GitHub` (nếu chưa có sau bước "Install suggested plugins").
-- Job `cicd-demo` → **Configure** → tick **GitHub hook trigger for GITScm polling** → Save.
-
-**2. Trên GitHub:**
-
-Repo Settings → **Webhooks** → **Add webhook**:
-
-- **Payload URL**: `http://<JENKINS_URL>/github-webhook/` (nhớ dấu `/` cuối)
+- **Payload URL**: `http://<JENKINS_URL>/github-webhook/`
 - **Content type**: `application/json`
-- **Which events**: chọn `Just the push event`
-- **Active**: tick → **Add webhook**
+- **Which events**: `Just the push event`
+- → **Add webhook**.
 
-Sau khi add, GitHub gửi 1 ping test — Jenkins trả `200 OK` là OK. Từ giờ mỗi `git push` sẽ trigger build trong vài giây.
-
+Sau khi add, mỗi `git push` sẽ trigger pipeline trong vài giây.
