@@ -54,6 +54,13 @@ resource "aws_iam_role_policy_attachment" "eks_container_registry_policy" {
   role       = aws_iam_role.eks_node_role.name
 }
 
+# Cho phép Jenkins pod push image lên ECR (qua node instance role).
+# Demo only — production nên dùng IRSA gán role riêng cho jenkins SA.
+resource "aws_iam_role_policy_attachment" "eks_ecr_power_user" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+  role       = aws_iam_role.eks_node_role.name
+}
+
 # Security Group for EKS Cluster
 resource "aws_security_group" "eks_cluster_sg" {
   name        = "${var.cluster_name}-cluster-sg"

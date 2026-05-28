@@ -1,53 +1,105 @@
 pipeline {
-  agent any
+  agent {
+    kubernetes {
+      defaultContainer 'aws'
+      yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  containers:
+    - name: aws
+      image: public.ecr.aws/aws-cli/aws-cli:latest
+      command: [sleep]
+      args: ["infinity"]
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+    - name: python
+      image: python:3.12-slim
+      command: [sleep]
+      args: ["infinity"]
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.23.2-debug
+      command: [sleep]
+      args: ["infinity"]
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+    - name: kubectl
+      image: bitnami/kubectl:1.31
+      command: [sleep]
+      args: ["infinity"]
+  volumes:
+    - name: docker-config
+      emptyDir: {}
+'''
+    }
+  }
 
   triggers {
     githubPush()
   }
 
   environment {
-    AWS_REGION = 'ap-southeast-1'
-    ECR_REPO   = "${env.ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/cicd-demo-app"
-    IMAGE_TAG  = "${env.GIT_COMMIT?.take(7) ?: 'latest'}"
-    APP_DIR    = 'cicd/app'
+    AWS_REGION  = 'ap-southeast-1'
+    ACCOUNT_ID  = '891920435433'
+    ECR_REPO    = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/cicd-demo-app"
+    IMAGE_TAG   = "${env.GIT_COMMIT?.take(7) ?: 'latest'}"
+    APP_DIR     = 'cicd/app'
   }
 
   stages {
     stage('Test') {
       steps {
-        dir("${APP_DIR}") {
+        container('python') {
+          dir("${APP_DIR}") {
+            sh '''
+              pip install --quiet -r requirements.txt pytest
+              python -m pytest -q || true
+              python -c "import ast; ast.parse(open('app.py').read())"
+            '''
+          }
+        }
+      }
+    }
+
+    stage('ECR login') {
+      steps {
+        container('aws') {
           sh '''
-            pip install --quiet -r requirements.txt pytest
-            python -m pytest -q || true
-            python -c "import ast; ast.parse(open('app.py').read())"
+            TOKEN=$(aws ecr get-login-password --region $AWS_REGION)
+            AUTH=$(printf "AWS:%s" "$TOKEN" | base64 -w0)
+            cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com":{"auth":"$AUTH"}}}
+EOF
           '''
         }
       }
     }
 
-    stage('Build') {
+    stage('Build + Push (kaniko)') {
       steps {
-        sh 'docker build -t $ECR_REPO:$IMAGE_TAG $APP_DIR'
-      }
-    }
-
-    stage('Push to ECR') {
-      steps {
-        sh '''
-          aws ecr get-login-password --region $AWS_REGION \
-            | docker login --username AWS --password-stdin $ECR_REPO
-          docker push $ECR_REPO:$IMAGE_TAG
-        '''
+        container('kaniko') {
+          sh '''
+            /kaniko/executor \
+              --context $WORKSPACE/$APP_DIR \
+              --dockerfile $WORKSPACE/$APP_DIR/Dockerfile \
+              --destination $ECR_REPO:$IMAGE_TAG \
+              --destination $ECR_REPO:latest
+          '''
+        }
       }
     }
 
     stage('Deploy to EKS') {
       steps {
-        sh '''
-          aws eks update-kubeconfig --region $AWS_REGION --name cicd-demo-eks
-          kubectl -n app set image deployment/app app=$ECR_REPO:$IMAGE_TAG
-          kubectl -n app rollout status deployment/app --timeout=120s
-        '''
+        container('kubectl') {
+          sh '''
+            kubectl -n app set image deployment/app app=$ECR_REPO:$IMAGE_TAG
+            kubectl -n app rollout status deployment/app --timeout=120s
+          '''
+        }
       }
     }
   }

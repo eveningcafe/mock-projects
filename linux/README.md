@@ -17,8 +17,8 @@ Hệ thống gồm 4 VM kết nối trong mạng nội bộ `corp.internal`. `in
   │  ┌─────────────────┐      ┌─────────────────┐                     │
   │  │    infra-vm     │      │   storage-vm    │                     │
   │  │─────────────────│      │─────────────────│                     │
-  │  │ DNS  (bind9)    │      │ data partition  │                     │
-  │  │ NTP  (chrony)   │      │ MinIO           │                     │
+  │  │ DNS  (bind9)x   │      │ data partition  │                     │
+  │  │ NTP  (chrony)x  │      │ MinIO ( helm )  │                     │
   │  │                 │      │ (single drive)  │                     │
   │  └─────────────────┘      └────────┬────────┘                     │
   │          │                         │                              │
@@ -26,17 +26,17 @@ Hệ thống gồm 4 VM kết nối trong mạng nội bộ `corp.internal`. `in
   │          │               ┌─────────────────┐                      │
   │          └──────────────▶│    app-vm       │                      │
   │                          │─────────────────│                      │
-  │                          │ Nginx + TLS     │                      │
-  │                          │ Ping App (x1)   │                      │
-  │                          │ MariaDB         │                      │ 
-  │                          │ MongoDB         │                      │ 
-  │                          │ Redis           │                      │
+  │                          │ Nginx + TLS     │ (service type loadbalancer )--> NLB  & Ingress │
+  │                          │ Ping App (x1)   │ (deployment --> helm) │
+  │                          │ MariaDB   x     │                      │ 
+  │                          │ MongoDB   x     │                      │ 
+  │                          │ Redis     x     │                      │
   │                          └────────▲────────┘                      │
   │                                   │ HTTPS (app.corp.internal)     │
   │                          ┌────────┴────────┐                      │
   │                          │   client-vm     │                      │
   │                          │─────────────────│                      │
-  │                          │ kiểm tra & test │                      │
+  │                          │ kiểm tra & test │  [deployment netshoot] │
   │                          └─────────────────┘                      │
   │                                                                   │
   └───────────────────────────────────────────────────────────────────┘
