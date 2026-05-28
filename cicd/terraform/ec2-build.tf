@@ -110,7 +110,7 @@ resource "aws_instance" "build" {
     #!/bin/bash
     set -e
     apt-get update
-    apt-get install -y openjdk-17-jre-headless docker.io unzip git curl
+    apt-get install -y openjdk-21-jre-headless docker.io unzip git curl
 
     # aws CLI v2
     curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscli.zip
