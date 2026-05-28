@@ -37,6 +37,96 @@ cicd/
     └── Jenkinsfile            # Pipeline chạy trên EC2 agent
 ```
 
+## Cài đặt
+
+### Yêu cầu
+
+- `aws` CLI v2 đã login (`aws sso login` hoặc access key)
+- `terraform` >= 1.5
+- `kubectl` >= 1.31
+- `docker` (chỉ cần để build/push image app lần đầu, sau đó EC2 agent lo)
+
+### Bước 1 — Dựng hạ tầng
+
+```bash
+cd cicd/terraform
+terraform init
+terraform apply -var="db_password=ChangeMe1234!"
+```
+
+Tạo trong ~15 phút: VPC, EKS cluster + nodegroup, RDS, ECR, EBS CSI driver, EC2 build machine, IAM Access Entry.
+
+Outputs:
+
+```
+cluster_name             = "cicd-demo-eks"
+cluster_endpoint         = "https://...eks.amazonaws.com"
+ecr_repository_url       = "<account>.dkr.ecr.ap-southeast-1.amazonaws.com/cicd-demo-app"
+rds_endpoint             = "cicd-demo-db.<id>.ap-southeast-1.rds.amazonaws.com"
+build_machine_public_ip  = "<EC2_IP>"
+build_machine_ssh_key    = "./build-machine-key.pem"
+kubeconfig_command       = "aws eks update-kubeconfig --region ap-southeast-1 --name cicd-demo-eks"
+```
+
+### Bước 2 — Cấu hình kubectl
+
+```bash
+aws eks update-kubeconfig --region ap-southeast-1 --name cicd-demo-eks
+kubectl get nodes   # 2 nodes Ready
+```
+
+### Bước 3 — Cài Nginx Ingress controller
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.2/deploy/static/provider/aws/deploy.yaml
+kubectl -n ingress-nginx wait --for=condition=Available deployment/ingress-nginx-controller --timeout=180s
+```
+
+### Bước 4 — Cài Jenkins master
+
+```bash
+kubectl apply -f cicd/k8s-install-jenkins.yaml
+kubectl -n jenkins rollout status deployment/jenkins --timeout=240s
+```
+
+### Bước 5 — Build app image + deploy
+
+```bash
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+REGION=ap-southeast-1
+REPO=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/cicd-demo-app
+
+aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REPO
+docker build -t $REPO:v1 cicd/app/
+docker push $REPO:v1
+
+# Substitute real values vào manifest và apply
+sed \
+  -e "s|REPLACE_WITH_RDS_ENDPOINT|$(terraform -chdir=cicd/terraform output -raw rds_endpoint)|" \
+  -e 's|REPLACE_WITH_PASSWORD|ChangeMe1234!|' \
+  -e "s|REPLACE_WITH_ECR_URI:latest|$REPO:v1|" \
+  cicd/k8s/app.yaml | kubectl apply -f -
+```
+
+### Bước 6 — Lấy các URL
+
+```bash
+# Jenkins
+kubectl -n jenkins get svc jenkins -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+# App (qua Nginx Ingress ALB)
+kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+# Initial Jenkins admin password
+kubectl -n jenkins exec deploy/jenkins -- cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+> Terraform không xuất Jenkins URL ra output vì LoadBalancer được Kubernetes provision sau, không phải Terraform. Dùng `kubectl` ở trên để lấy.
+
+### Bước 7 — Setup Jenkins + EC2 agent + GitHub webhook
+
+Xem các chương dưới: [Setup Jenkins master](#setup-jenkins-master-chạy-1-lần), [Đăng ký EC2 làm JNLP agent](#đăng-ký-ec2-làm-jnlp-agent), [Tạo Pipeline job](#tạo-pipeline-job), [Auto-trigger khi push code](#auto-trigger-khi-push-code-github-webhook).
+
 ## Kiến trúc CI/CD
 
 - **Jenkins master**: chạy trên EKS, dữ liệu lưu PVC 10Gi (gp3). Không cài tool build, chỉ orchestrate.
@@ -128,3 +218,30 @@ Repo GitHub → Settings → **Webhooks** → **Add webhook**:
 - → **Add webhook**.
 
 Sau khi add, mỗi `git push` sẽ trigger pipeline trong vài giây.
+
+## Dọn dẹp (Destroy)
+
+⚠️ **Thứ tự quan trọng**: xóa Kubernetes Service type=LoadBalancer + PVC TRƯỚC khi `terraform destroy`. Nếu destroy terraform trước, AWS LoadBalancers (NLB/ALB) và EBS volume sẽ bị orphan và phát sinh phí.
+
+```bash
+# 1. Xóa app + ingress + jenkins (sẽ release các LoadBalancer + EBS volume)
+kubectl delete -f cicd/k8s/app.yaml --ignore-not-found
+kubectl delete -f cicd/k8s-install-jenkins.yaml --ignore-not-found
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.2/deploy/static/provider/aws/deploy.yaml --ignore-not-found
+
+# 2. Đợi vài chục giây cho AWS cleanup các LB
+sleep 60
+
+# 3. Destroy infrastructure
+cd cicd/terraform
+terraform destroy -var="db_password=ChangeMe1234!"
+```
+
+Kiểm tra sau khi xong:
+
+```bash
+aws elbv2 describe-load-balancers --region ap-southeast-1   # nên empty
+aws ec2 describe-volumes --region ap-southeast-1 --filters Name=status,Values=available   # nên empty
+```
+
+Nếu vẫn còn LB/volume orphan: xóa thủ công qua AWS Console hoặc CLI để tránh chi phí.
