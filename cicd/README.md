@@ -89,26 +89,7 @@ kubectl apply -f cicd/k8s-install-jenkins.yaml
 kubectl -n jenkins rollout status deployment/jenkins --timeout=240s
 ```
 
-### Bước 5 — Build app image + deploy
-
-```bash
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=ap-southeast-1
-REPO=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/cicd-demo-app
-
-aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REPO
-docker build -t $REPO:v1 cicd/app/
-docker push $REPO:v1
-
-# Substitute real values vào manifest và apply
-sed \
-  -e "s|REPLACE_WITH_RDS_ENDPOINT|$(terraform -chdir=cicd/terraform output -raw rds_endpoint)|" \
-  -e 's|REPLACE_WITH_PASSWORD|ChangeMe1234!|' \
-  -e "s|REPLACE_WITH_ECR_URI:latest|$REPO:v1|" \
-  cicd/k8s/app.yaml | kubectl apply -f -
-```
-
-### Bước 6 — Lấy các URL
+### Bước 5 — Lấy các URL
 
 ```bash
 # Jenkins
@@ -123,9 +104,11 @@ kubectl -n jenkins exec deploy/jenkins -- cat /var/jenkins_home/secrets/initialA
 
 > Terraform không xuất Jenkins URL ra output vì LoadBalancer được Kubernetes provision sau, không phải Terraform. Dùng `kubectl` ở trên để lấy.
 
-### Bước 7 — Setup Jenkins + EC2 agent + GitHub webhook
+### Bước 6 — Setup Jenkins + EC2 agent + GitHub webhook
 
 Xem các chương dưới: [Setup Jenkins master](#setup-jenkins-master-chạy-1-lần), [Đăng ký EC2 làm JNLP agent](#đăng-ký-ec2-làm-jnlp-agent), [Tạo Pipeline job](#tạo-pipeline-job), [Auto-trigger khi push code](#auto-trigger-khi-push-code-github-webhook).
+
+> Pipeline chỉ làm `kubectl set image` — cần deployment tồn tại sẵn. Lần đầu phải `kubectl apply -f cicd/k8s/app.yaml` (sau khi sed thay `REPLACE_WITH_RDS_ENDPOINT` / `REPLACE_WITH_PASSWORD` / `REPLACE_WITH_ECR_URI:latest`). Sau đó pipeline tự lo các lần update tiếp theo.
 
 ## Kiến trúc CI/CD
 
