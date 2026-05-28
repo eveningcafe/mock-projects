@@ -38,13 +38,25 @@ spec:
       serviceAccountName: jenkins
       containers:
         - name: jenkins
-          image: jenkins/jenkins:lts
+          image: 891920435433.dkr.ecr.ap-southeast-1.amazonaws.com/cicd-demo-app:jenkins-v1
           ports:
             - containerPort: 8080
             - containerPort: 50000
+          env:
+            - name: DOCKER_HOST
+              value: tcp://localhost:2375
           volumeMounts:
             - name: home
               mountPath: /var/jenkins_home
+        - name: dind
+          image: docker:27-dind
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          args:
+            - --host=tcp://0.0.0.0:2375
       volumes:
         - name: home
           emptyDir: {}
