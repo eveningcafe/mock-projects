@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Notes</title>
+  <style>
+    body { font-family: sans-serif; max-width: 480px; margin: 2rem auto; }
+    li { padding: 4px 0; }
+    input { width: 70%; padding: 6px; }
+    button { padding: 6px 12px; }
+  </style>
+</head>
+<body>
+  <h1>Notes</h1>
+  <form id="f">
+    <input id="t" placeholder="Nhập ghi chú..." required>
+    <button>Thêm</button>
+  </form>
+  <ul id="list"></ul>
+  <script>
+    async function load() {
+      const r = await fetch('/api/items');
+      const items = await r.json();
+      document.getElementById('list').innerHTML =
+        items.map(i => `<li>#${i.id} — ${i.text}</li>`).join('');
+    }
+    document.getElementById('f').onsubmit = async (e) => {
+      e.preventDefault();
+      const t = document.getElementById('t');
+      await fetch('/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: t.value }),
+      });
+      t.value = '';
+      load();
+    };
+    load();
+  </script>
+</body>
+</html>

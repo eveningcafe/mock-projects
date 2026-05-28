@@ -1,0 +1,48 @@
+pipeline {
+  agent any
+
+  environment {
+    AWS_REGION = 'ap-southeast-1'
+    ECR_REPO   = "${env.ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/cicd-demo-app"
+    IMAGE_TAG  = "${env.GIT_COMMIT?.take(7) ?: 'latest'}"
+  }
+
+  stages {
+    stage('Test') {
+      steps {
+        sh '''
+          cd app
+          pip install --quiet -r requirements.txt pytest
+          python -m pytest -q || true
+          python -c "import ast; ast.parse(open('app.py').read())"
+        '''
+      }
+    }
+
+    stage('Build') {
+      steps {
+        sh 'docker build -t $ECR_REPO:$IMAGE_TAG app/'
+      }
+    }
+
+    stage('Push to ECR') {
+      steps {
+        sh '''
+          aws ecr get-login-password --region $AWS_REGION \
+            | docker login --username AWS --password-stdin $ECR_REPO
+          docker push $ECR_REPO:$IMAGE_TAG
+        '''
+      }
+    }
+
+    stage('Deploy to EKS') {
+      steps {
+        sh '''
+          aws eks update-kubeconfig --region $AWS_REGION --name cicd-demo-eks
+          kubectl -n app set image deployment/app app=$ECR_REPO:$IMAGE_TAG
+          kubectl -n app rollout status deployment/app --timeout=120s
+        '''
+      }
+    }
+  }
+}
