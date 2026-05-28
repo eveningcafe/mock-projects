@@ -1,6 +1,10 @@
 pipeline {
   agent any
 
+  triggers {
+    githubPush()
+  }
+
   environment {
     AWS_REGION = 'ap-southeast-1'
     ECR_REPO   = "${env.ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/cicd-demo-app"

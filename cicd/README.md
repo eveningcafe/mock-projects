@@ -69,3 +69,23 @@ kubectl -n jenkins exec deploy/jenkins -- cat /var/jenkins_home/secrets/initialA
 - **Custom Jenkins image**: tự build image kế thừa `jenkins/jenkins:lts` cài thêm docker/aws/kubectl, push lên ECR, sửa deployment.
 - **Kubernetes plugin + Pod templates**: cài plugin `kubernetes`, dùng `agent { kubernetes {...} }` trong Jenkinsfile để spawn pod chứa sẵn tools.
 
+## Auto-trigger pipeline khi push code (GitHub webhook)
+
+Jenkinsfile đã có `triggers { githubPush() }`. Cần cấu hình thêm 2 phía:
+
+**1. Trên Jenkins:**
+
+- **Manage Jenkins → Plugins → Available** → cài plugin `GitHub` (nếu chưa có sau bước "Install suggested plugins").
+- Job `cicd-demo` → **Configure** → tick **GitHub hook trigger for GITScm polling** → Save.
+
+**2. Trên GitHub:**
+
+Repo Settings → **Webhooks** → **Add webhook**:
+
+- **Payload URL**: `http://<JENKINS_URL>/github-webhook/` (nhớ dấu `/` cuối)
+- **Content type**: `application/json`
+- **Which events**: chọn `Just the push event`
+- **Active**: tick → **Add webhook**
+
+Sau khi add, GitHub gửi 1 ping test — Jenkins trả `200 OK` là OK. Từ giờ mỗi `git push` sẽ trigger build trong vài giây.
+
