@@ -9,23 +9,25 @@ pipeline {
     AWS_REGION = 'ap-southeast-1'
     ECR_REPO   = "${env.ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/cicd-demo-app"
     IMAGE_TAG  = "${env.GIT_COMMIT?.take(7) ?: 'latest'}"
+    APP_DIR    = 'cicd/app'
   }
 
   stages {
     stage('Test') {
       steps {
-        sh '''
-          cd app
-          pip install --quiet -r requirements.txt pytest
-          python -m pytest -q || true
-          python -c "import ast; ast.parse(open('app.py').read())"
-        '''
+        dir("${APP_DIR}") {
+          sh '''
+            pip install --quiet -r requirements.txt pytest
+            python -m pytest -q || true
+            python -c "import ast; ast.parse(open('app.py').read())"
+          '''
+        }
       }
     }
 
     stage('Build') {
       steps {
-        sh 'docker build -t $ECR_REPO:$IMAGE_TAG app/'
+        sh 'docker build -t $ECR_REPO:$IMAGE_TAG $APP_DIR'
       }
     }
 
