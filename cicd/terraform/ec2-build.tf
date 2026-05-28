@@ -128,6 +128,25 @@ resource "aws_instance" "build" {
   tags = merge(var.tags, { Name = "${var.project}-build" })
 }
 
+# Cho phép EC2 build role gọi kubectl với quyền admin trong cluster
+resource "aws_eks_access_entry" "build" {
+  cluster_name  = aws_eks_cluster.eks_cluster.name
+  principal_arn = aws_iam_role.build.arn
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "build_admin" {
+  cluster_name  = aws_eks_cluster.eks_cluster.name
+  principal_arn = aws_iam_role.build.arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.build]
+}
+
 output "build_machine_public_ip" {
   value = aws_instance.build.public_ip
 }
