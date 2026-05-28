@@ -198,6 +198,15 @@ sed \
   cicd/k8s/app.yaml | kubectl apply -f -
 ```
 
+Kiểm tra app chạy:
+
+```bash
+INGRESS=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+curl -i http://$INGRESS/        # HTTP 200 — HTML từ Flask
+curl http://$INGRESS/api/items  # JSON list (mặc định [])
+# Hoặc mở browser: http://$INGRESS/
+```
+
 Xong — `git push` để trigger pipeline đầu tiên.
 
 ## Dọn dẹp (Destroy)
