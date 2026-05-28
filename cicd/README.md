@@ -37,3 +37,35 @@ cicd/
     └── Jenkinsfile            # Pipeline: Test → Build → Push ECR → Deploy EKS
 ```
 
+## Tạo pipeline trên Jenkins
+
+Sau khi `kubectl apply -f k8s-install-jenkins.yaml`, lấy URL và mật khẩu admin:
+
+```bash
+kubectl -n jenkins get svc jenkins -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl -n jenkins exec deploy/jenkins -- cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+**Setup ban đầu:**
+
+1. Mở Jenkins URL trong browser → **Unlock Jenkins** → paste password.
+2. **Install suggested plugins** (đợi 2-3 phút).
+3. **Create First Admin User** → username/password tùy chọn.
+4. **Instance URL** → giữ mặc định → Save.
+
+**Tạo Pipeline job:**
+
+5. Trang chủ → **New Item** → tên `cicd-demo` → chọn **Pipeline** → OK.
+6. Trong job config, kéo xuống section **Pipeline**:
+   - **Definition**: `Pipeline script from SCM`
+   - **SCM**: `Git`
+   - **Repository URL**: repo Git của project (vd `git@github.com:<user>/mock-projects.git`)
+   - **Branch**: `*/main`
+   - **Script Path**: `cicd/ci/Jenkinsfile`
+7. **Save** → **Build Now**.
+
+**Lưu ý**: image `jenkins/jenkins:lts` mặc định không có `docker`, `aws`, `kubectl`. Để pipeline chạy được cần một trong các cách:
+
+- **Custom Jenkins image**: tự build image kế thừa `jenkins/jenkins:lts` cài thêm docker/aws/kubectl, push lên ECR, sửa deployment.
+- **Kubernetes plugin + Pod templates**: cài plugin `kubernetes`, dùng `agent { kubernetes {...} }` trong Jenkinsfile để spawn pod chứa sẵn tools.
+
