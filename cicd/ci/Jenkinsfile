@@ -18,7 +18,7 @@ pipeline {
       steps {
         dir("${APP_DIR}") {
           sh '''
-            pip3 install --quiet --break-system-packages -r requirements.txt pytest
+            pip3 install --quiet --break-system-packages pytest
             python3 -m pytest -q || true
             python3 -c "import ast; ast.parse(open('app.py').read())"
           '''
